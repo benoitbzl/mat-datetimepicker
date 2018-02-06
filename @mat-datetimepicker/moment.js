@@ -167,7 +167,8 @@ MomentDatetimeAdapter.ctorParameters = () => [
 
 const MAT_MOMENT_DATETIME_FORMATS = {
     parse: {
-        dateInput: "l"
+        dateInput: "l",
+        timeInput: "LT"
     },
     display: {
         dateInput: "l",
