@@ -327,6 +327,21 @@ class DatetimeAdapter extends DateAdapter$1 {
     invalid() {
         return this._delegate.invalid();
     }
+    /**
+     * @param {?} date
+     * @param {?=} min
+     * @param {?=} max
+     * @return {?}
+     */
+    clampDate(date, min, max) {
+        if (min && this.compareDatetime(date, min) < 0) {
+            return min;
+        }
+        if (max && this.compareDatetime(date, max) > 0) {
+            return max;
+        }
+        return date;
+    }
 }
 
 const MAT_DATETIME_FORMATS = new InjectionToken("mat-datetime-formats");
@@ -985,6 +1000,7 @@ var Subscriber = (function (_super) {
                 }
                 if (typeof destinationOrNext === 'object') {
                     if (destinationOrNext instanceof Subscriber) {
+                        this.syncErrorThrowable = destinationOrNext.syncErrorThrowable;
                         this.destination = destinationOrNext;
                         this.destination.add(this);
                     }
@@ -2036,17 +2052,8 @@ MatDatetimepickerCalendar.decorators = [
      * attribute, however Chrome handles high contrast differently.
      */
     /* Theme for the ripple elements.*/
-    /** The mixins below are shared between mat-menu and mat-select */
-    /**
-     * This mixin adds the correct panel transform styles based
-     * on the direction that the menu panel opens.
-     */
     /* stylelint-disable material/no-prefixes */
     /* stylelint-enable */
-    /**
-     * This mixin contains shared option styles between the select and
-     * autocomplete components.
-     */
     .mat-datetimepicker-calendar {
       -webkit-user-select: none;
       -moz-user-select: none;
@@ -2332,17 +2339,8 @@ MatDatetimepickerCalendarBody.decorators = [
      * attribute, however Chrome handles high contrast differently.
      */
     /* Theme for the ripple elements.*/
-    /** The mixins below are shared between mat-menu and mat-select */
-    /**
-     * This mixin adds the correct panel transform styles based
-     * on the direction that the menu panel opens.
-     */
     /* stylelint-disable material/no-prefixes */
     /* stylelint-enable */
-    /**
-     * This mixin contains shared option styles between the select and
-     * autocomplete components.
-     */
     .mat-datetimepicker-calendar-body {
       font-size: 13px;
       min-width: 224px; }
@@ -2447,6 +2445,7 @@ class MatDatetimepickerClock {
         this._element = _element;
         this._adapter = _adapter;
         this._userSelection = new EventEmitter();
+        this._timeChanged = false;
         this.interval = 1;
         this.twelvehour = false;
         /**
@@ -2579,6 +2578,7 @@ class MatDatetimepickerClock {
      * @return {?}
      */
     _handleMousedown(event) {
+        this._timeChanged = false;
         this.setTime(event);
         document.addEventListener("mousemove", this.mouseMoveListener);
         document.addEventListener("touchmove", this.mouseMoveListener);
@@ -2601,9 +2601,11 @@ class MatDatetimepickerClock {
         document.removeEventListener("touchmove", this.mouseMoveListener);
         document.removeEventListener("mouseup", this.mouseUpListener);
         document.removeEventListener("touchend", this.mouseUpListener);
-        this.selectedChange.emit(this.activeDate);
-        if (!this._hourView) {
-            this._userSelection.emit();
+        if (this._timeChanged) {
+            this.selectedChange.emit(this.activeDate);
+            if (!this._hourView) {
+                this._userSelection.emit();
+            }
         }
     }
     /**
@@ -2707,8 +2709,12 @@ class MatDatetimepickerClock {
             }
             date = this._adapter.createDatetime(this._adapter.getYear(this.activeDate), this._adapter.getMonth(this.activeDate), this._adapter.getDate(this.activeDate), this._adapter.getHour(this.activeDate), value);
         }
-        this.activeDate = this._adapter.clampDate(date, this.minDate, this.maxDate);
-        this.activeDateChange.emit(this.activeDate);
+        const /** @type {?} */ clamped = this._adapter.clampDate(date, this.minDate, this.maxDate);
+        if (date === clamped) {
+            this._timeChanged = true;
+            this.activeDate = clamped;
+            this.activeDateChange.emit(this.activeDate);
+        }
     }
 }
 MatDatetimepickerClock.decorators = [
@@ -2744,17 +2750,8 @@ MatDatetimepickerClock.decorators = [
      * attribute, however Chrome handles high contrast differently.
      */
     /* Theme for the ripple elements.*/
-    /** The mixins below are shared between mat-menu and mat-select */
-    /**
-     * This mixin adds the correct panel transform styles based
-     * on the direction that the menu panel opens.
-     */
     /* stylelint-disable material/no-prefixes */
     /* stylelint-enable */
-    /**
-     * This mixin contains shared option styles between the select and
-     * autocomplete components.
-     */
     :host {
       position: relative;
       display: block;
@@ -2940,17 +2937,8 @@ MatDatetimepickerContent.decorators = [
      * attribute, however Chrome handles high contrast differently.
      */
     /* Theme for the ripple elements.*/
-    /** The mixins below are shared between mat-menu and mat-select */
-    /**
-     * This mixin adds the correct panel transform styles based
-     * on the direction that the menu panel opens.
-     */
     /* stylelint-disable material/no-prefixes */
     /* stylelint-enable */
-    /**
-     * This mixin contains shared option styles between the select and
-     * autocomplete components.
-     */
     .mat-datetimepicker-content {
       -webkit-box-shadow: 0px 5px 5px -3px rgba(0, 0, 0, 0.2), 0px 8px 10px 1px rgba(0, 0, 0, 0.14), 0px 3px 14px 2px rgba(0, 0, 0, 0.12);
               box-shadow: 0px 5px 5px -3px rgba(0, 0, 0, 0.2), 0px 8px 10px 1px rgba(0, 0, 0, 0.14), 0px 3px 14px 2px rgba(0, 0, 0, 0.12);
@@ -3668,15 +3656,18 @@ class MatDatetimepickerInput {
         value = this._dateAdapter.getValidDateOrNull(value);
         let /** @type {?} */ oldDate = this.value;
         this._value = value;
-        this._renderer.setProperty(this._elementRef.nativeElement, "value", value ? this._dateAdapter.format(value, this.getFormat()) : "");
-        if (!this._dateAdapter.sameDatetime(oldDate, value)) {
-            this._valueChange.emit(value);
-        }
+        // use timeout to ensure the datetimepicker is instantiated and we get the correct format
+        setTimeout(() => {
+            this._renderer.setProperty(this._elementRef.nativeElement, "value", value ? this._dateAdapter.format(value, this.getDisplayFormat()) : "");
+            if (!this._dateAdapter.sameDatetime(oldDate, value)) {
+                this._valueChange.emit(value);
+            }
+        });
     }
     /**
      * @return {?}
      */
-    getFormat() {
+    getDisplayFormat() {
         switch (this._datepicker.type) {
             case "date":
                 return this._dateFormats.display.dateInput;
@@ -3687,6 +3678,27 @@ class MatDatetimepickerInput {
             case "month":
                 return this._dateFormats.display.monthInput;
         }
+    }
+    /**
+     * @return {?}
+     */
+    getParseFormat() {
+        let /** @type {?} */ parseFormat;
+        switch (this._datepicker.type) {
+            case "time":
+                parseFormat = this._dateFormats.parse.timeInput;
+                break;
+            case "date":
+                parseFormat = this._dateFormats.parse.dateInput;
+                break;
+            default:
+                parseFormat = this._dateFormats.parse.dateInput;
+                break;
+        }
+        if (!parseFormat) {
+            parseFormat = this._dateFormats.parse.dateInput;
+        }
+        return parseFormat;
     }
     /**
      * The minimum valid date.
@@ -3824,7 +3836,7 @@ class MatDatetimepickerInput {
      * @return {?}
      */
     _onInput(value) {
-        let /** @type {?} */ date = this._dateAdapter.parse(value, this._dateFormats.parse.dateInput);
+        let /** @type {?} */ date = this._dateAdapter.parse(value, this.getParseFormat());
         this._lastValueValid = !date || this._dateAdapter.isValid(date);
         date = this._dateAdapter.getValidDateOrNull(date);
         this._value = date;

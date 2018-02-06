@@ -24,6 +24,7 @@ export declare class MatDatetimepickerClock<D> implements AfterContentInit {
     /** The minimum selectable date. */
     minDate: D | null;
     private _minDate;
+    private _timeChanged;
     /** The maximum selectable date. */
     maxDate: D | null;
     private _maxDate;

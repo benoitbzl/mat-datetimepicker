@@ -2,6 +2,7 @@ import { InjectionToken } from "@angular/core";
 export declare type MatDatetimeFormats = {
     parse: {
         dateInput: any;
+        timeInput?: any;
     };
     display: {
         dateInput: any;

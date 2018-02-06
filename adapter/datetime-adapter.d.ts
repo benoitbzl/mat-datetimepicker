@@ -41,4 +41,5 @@ export declare abstract class DatetimeAdapter<D> extends DateAdapter<D> {
     isDateInstance(obj: any): boolean;
     isValid(date: D): boolean;
     invalid(): D;
+    clampDate(date: D, min?: D | null, max?: D | null): D;
 }

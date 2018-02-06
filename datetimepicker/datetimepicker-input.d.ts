@@ -33,7 +33,8 @@ export declare class MatDatetimepickerInput<D> implements AfterContentInit, Cont
     _dateFilter: (date: D | null) => boolean;
     /** The value of the input. */
     value: D | null;
-    private getFormat();
+    private getDisplayFormat();
+    private getParseFormat();
     private _value;
     /** The minimum valid date. */
     min: D | null;
